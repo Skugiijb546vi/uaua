@@ -1,18 +1,30 @@
-# ناوی فایل: main.py
+name: Run My Scraper
 
-import os
-from my_code import run_my_script # کۆدەکەی خۆت بانگ دەکەین
+on:
+  workflow_dispatch:
+    inputs:
+      website_url:
+        description: 'لینکەکە لێرە بنووسە (بۆ نموونە: https://zedflix.tv/)'
+        required: true
+        default: 'https://zedflix.tv/'
 
-# لێرەدا ئەو لینکە وەردەگرین کە لە سندووقەکەی گیتھەب نووسیوتە
-url = os.getenv("TARGET_URL")
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
 
-if url:
-    print(f"لینکەکە وەرگیرا: {url}")
-    print("دەست دەکەم بە جێبەجێکردنی کۆدەکە...")
-    
-    # کۆدەکەی تۆ جێبەجێ دەکات لەسەر ئەو لینکە
-    run_my_script(url)
-    
-    print("کارەکان بە سەرکەوتوویی تەواو بوون!")
-else:
-    print("هیچ لینکێک نەدراوە! تکایە لینکێک بنووسە کاتێک کۆدەکە کار پێ دەکەیت.")
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install Dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Main Script
+        env:
+          TARGET_URL: ${{ github.event.inputs.website_url }} # لێرەدا لینکەکە دەدەین بە پایتۆن
+        run: python main.py
